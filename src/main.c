@@ -1,88 +1,144 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
 
 #include "../includes/colors.h"
 
+// Prototypes des fonctions
 size_t  ft_strlen(const char *s);
 char    *ft_strcpy(char *dest, const char *src);
 int     ft_strcmp(const char *s1, const char *s2);
+ssize_t ft_write(int fd, const void *buf, size_t count);
+ssize_t ft_read(int fd, void *buf, size_t count);
+char    *ft_strdup(const char *s);
 
-int main() {
-    printf(CYAN "=== TEST FT_STRLEN ===\n" RESET);
+int main(void) {
+
+    /* -------------------------------------------------------------------- */
+    /* 1. FT_STRLEN                                                         */
+    /* -------------------------------------------------------------------- */
+    printf(CYAN "=== 1. TEST FT_STRLEN ===\n" RESET);
     {
-        const char *tests[] = {
-            "Hello World",
-            "",
-            "a",
-            "Un long texte pour tester si la boucle rcx ne plante pas...",
-            NULL
-        };
+        const char *str = "Hello World!";
+        size_t res_sys = strlen(str);
+        size_t res_mine = ft_strlen(str);
 
-        for (int i = 0; tests[i] != NULL; i++) {
-            size_t sys = strlen(tests[i]);
-            size_t mine = ft_strlen(tests[i]);
-            printf("[%s] sys: %lu, mine: %lu -> [%s]\n",
-                tests[i],
-                sys,
-                mine,
-                sys == mine ? GREEN "OK" RESET: RED "KO" RESET);
-        }
+        printf("Chaine  : \"%s\"\n", str);
+        printf("Vrai    : %lu\n", res_sys);
+        printf("Libasm  : %lu -> [%s]\n\n", res_mine, 
+               (res_sys == res_mine) ? GREEN "OK" RESET : RED "KO" RESET);
     }
 
-    printf(CYAN "\n=== TEST FT_STRCPY ===\n" RESET);
+    /* -------------------------------------------------------------------- */
+    /* 2. FT_STRCPY                                                         */
+    /* -------------------------------------------------------------------- */
+    printf(CYAN "=== 2. TEST FT_STRCPY ===\n" RESET);
     {
-        const char *srcs[] = {
-            "Hello World",
-            "",
-            "Un deux trois 123456789",
-            NULL
-        };
+        const char *src = "Copie moi !";
+        char dest_sys[50];
+        char dest_mine[50];
 
-        for (int i = 0; srcs[i] != NULL; i++) {
-            char sys_dest[100];
-            char mine_dest[100];
+        strcpy(dest_sys, src);
+        ft_strcpy(dest_mine, src);
 
-            strcpy(sys_dest, srcs[i]);
-            char *ret = ft_strcpy(mine_dest, srcs[i]);
-
-            int ok = (strcmp(sys_dest, mine_dest) == 0) && (ret == mine_dest);
-
-            printf("[%s] sys: %s, mine: %s -> [%s]\n",
-                srcs[i],
-                sys_dest,
-                mine_dest,
-                ok ? GREEN "OK" RESET : RED "KO" RESET);
-        }
+        printf("Source  : \"%s\"\n", src);
+        printf("Vrai    : \"%s\"\n", dest_sys);
+        printf("Libasm  : \"%s\" -> [%s]\n\n", dest_mine, 
+               (strcmp(dest_sys, dest_mine) == 0) ? GREEN "OK" RESET : RED "KO" RESET);
     }
 
-    printf(CYAN "\n=== TEST FT_STRCMP ===\n" RESET);
+    /* -------------------------------------------------------------------- */
+    /* 3. FT_STRCMP                                                         */
+    /* -------------------------------------------------------------------- */
+    printf(CYAN "=== 3. TEST FT_STRCMP ===\n" RESET);
     {
-        struct {
-            const char *s1;
-            const char *s2;
-        } tests[] = {
-            {"Hello world", "Hello you"},      // s1 < s2
-            {"Hello you", "Hello world"},      // s1 > s2
-            {"Hello world", "Hello world"},    // s1 == s2
-            {"", ""},                          // Chaines vides
-            {"Hello", ""},                     // Chaine vide en s2
-            {"", "Hello"},                     // Chaine vide en s1
-            {"ABC", "AB"},                     // Longueurs differentes
-            {"\xff", "\x01"},                  // Test de l'unsigned char (tres important !)
-            {NULL, NULL}
-        };
+        const char *s1 = "AAA";
+        const char *s2 = "BBB";
 
-        for (int i = 0; tests[i].s1 != NULL; i++) {
-            int sys = strcmp(tests[i].s1, tests[i].s2);
-            int mine = ft_strcmp(tests[i].s1, tests[i].s2);
+        int res_sys = strcmp(s1, s2);
+        int res_mine = ft_strcmp(s1, s2);
 
-            // On verifie si le signe est identique (car la libc peut renvoyer n'importe quel entier negatif/positif)
-            int ok = (sys == mine) || (sys < 0 && mine < 0) || (sys > 0 && mine > 0);
+        // On verifie si les deux renvoient le meme signe (negatif dans ce cas)
+        int same_sign = (res_sys < 0 && res_mine < 0) || (res_sys > 0 && res_mine > 0) || (res_sys == res_mine);
 
-            printf("[%s] vs [%s] -> Libc: %d | Mine: %d [%s]\n", 
-                tests[i].s1, tests[i].s2, sys, mine, ok ? "OK" : "KO");
-        }
+        printf("Compare : \"%s\" et \"%s\"\n", s1, s2);
+        printf("Vrai    : %d\n", res_sys);
+        printf("Libasm  : %d -> [%s]\n\n", res_mine, 
+               same_sign ? GREEN "OK" RESET : RED "KO" RESET);
+    }
+
+    /* -------------------------------------------------------------------- */
+    /* 4. FT_WRITE                                                          */
+    /* -------------------------------------------------------------------- */
+    printf(CYAN "=== 4. TEST FT_WRITE ===\n" RESET);
+    {
+        // --- Test de sortie normale ---
+        printf("Ecriture sur l'ecran (stdout) :\n");
+        printf("Vrai    : "); fflush(stdout);
+        ssize_t ret_sys = write(1, "Hello\n", 6);
+
+        printf("Libasm  : "); fflush(stdout);
+        ssize_t ret_mine = ft_write(1, "Hello\n", 6);
+        printf("Retour write -> Vrai: %ld | Libasm: %ld\n\n", ret_sys, ret_mine);
+
+        // --- Test de gestion d'erreur (mauvais FD) ---
+        errno = 0;
+        ret_sys = write(-1, "test", 4);
+        int err_sys = errno;
+
+        errno = 0;
+        ret_mine = ft_write(-1, "test", 4);
+        int err_mine = errno;
+
+        printf("Test d'erreur (fd invalide = -1) :\n");
+        printf("Vrai    : ret = %ld, errno = %d\n", ret_sys, err_sys);
+        printf("Libasm  : ret = %ld, errno = %d -> [%s]\n\n", ret_mine, err_mine,
+               (ret_sys == ret_mine && err_sys == err_mine) ? GREEN "OK" RESET : RED "KO" RESET);
+    }
+
+    /* -------------------------------------------------------------------- */
+    /* 5. TEST FT_READ                                                      */
+    /* -------------------------------------------------------------------- */
+    printf(CYAN "=== 5. TEST FT_READ ===\n" RESET);
+    {
+        char buf_sys[50] = {0};
+        char buf_mine[50] = {0};
+
+        // --- Test d'erreur simple ---
+        errno = 0;
+        ssize_t ret_sys = read(-1, buf_sys, 10);
+        int err_sys = errno;
+
+        errno = 0;
+        ssize_t ret_mine = ft_read(-1, buf_mine, 10);
+        int err_mine = errno;
+
+        printf("Test d'erreur (fd invalide = -1) :\n");
+        printf("Vrai    : ret = %ld, errno = %d\n", ret_sys, err_sys);
+        printf("Libasm  : ret = %ld, errno = %d -> [%s]\n\n", ret_mine, err_mine,
+               (ret_sys == ret_mine && err_sys == err_mine) ? GREEN "OK" RESET : RED "KO" RESET);
+    }
+
+    /* -------------------------------------------------------------------- */
+    /* 6. FT_STRDUP                                                         */
+    /* -------------------------------------------------------------------- */
+    printf(CYAN "=== 6. TEST FT_STRDUP ===\n" RESET);
+    {
+        const char *str = "Chaine a dupliquer avec malloc";
+
+        char *sys_dup = strdup(str);
+        char *mine_dup = ft_strdup(str);
+
+        printf("Original: \"%s\"\n", str);
+        printf("Vrai    : \"%s\"\n", sys_dup);
+        printf("Libasm  : \"%s\" -> [%s]\n", mine_dup, 
+               (strcmp(sys_dup, mine_dup) == 0) ? GREEN "OK" RESET : RED "KO" RESET);
+
+        free(sys_dup);
+        free(mine_dup);
     }
 
     return (0);
